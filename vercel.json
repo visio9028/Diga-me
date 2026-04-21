@@ -1,0 +1,28 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "vercel-api.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "app-android-final-enhanced.html",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/vercel-api.js"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/app-android-final-enhanced.html"
+    }
+  ],
+  "functions": {
+    "vercel-api.js": {
+      "maxDuration": 10
+    }
+  }
+}
