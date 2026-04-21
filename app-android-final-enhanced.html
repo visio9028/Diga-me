@@ -1797,34 +1797,37 @@
                 // Seu repositório: https://github.com/visio9028/Diga-me
                 // URL Vercel: https://diga-me-visio9028.vercel.app
                 
-                // OUTRAS OPÇÕES:
-                // RENDER: this.serverUrl = 'https://seu-projeto.onrender.com';
-                // LOCAL: this.serverUrl = 'http://192.168.1.108:8002';
-                
                 this.apiKey = 'survey-pro-api-key-2024'; // Chave pública para testes
                 
-                // Dados locais para backup
-                this.surveys = JSON.parse(localStorage.getItem('surveys_final')) || [];
-                this.responses = JSON.parse(localStorage.getItem('responses_final')) || [];
+                // Dados ONLINE (servidor) - PRIMÁRIO
+                this.surveys = []; // Carregar do servidor
+                this.responses = []; // Carregar do servidor
+                this.users = []; // Carregar do servidor
+                
+                // Dados LOCAIS (backup apenas)
+                this.localSurveys = JSON.parse(localStorage.getItem('surveys_final')) || [];
+                this.localResponses = JSON.parse(localStorage.getItem('responses_final')) || [];
+                this.localUsers = JSON.parse(localStorage.getItem('app_users')) || [];
+                
                 this.currentSurvey = null;
                 this.currentTheme = localStorage.getItem('appTheme') || 'light';
-                this.users = JSON.parse(localStorage.getItem('app_users')) || [];
                 
-                // Carregar usuário com verificação mais robusta
-                const savedUser = localStorage.getItem('current_user');
-                if (savedUser && savedUser !== 'null' && savedUser !== 'undefined') {
-                    try {
-                        this.currentUser = JSON.parse(savedUser);
-                    } catch (e) {
-                        console.error('Erro ao carregar usuário:', e);
-                        this.currentUser = null;
-                    }
-                } else {
-                    this.currentUser = null;
-                }
+                // Sistema de usuários
+                this.currentUser = JSON.parse(localStorage.getItem('current_user'));
                 
-                this.isDeveloperMode = JSON.parse(localStorage.getItem('developer_mode')) || false;
+                // Modo desenvolvedor (padrão: true)
+                this.isDeveloperMode = localStorage.getItem('developer_mode') !== 'false';
                 
+                // Estado do aplicativo
+                this.currentSection = 'surveys';
+                this.isRespondentMode = false;
+                this.currentRespondentSurvey = null;
+                this.currentRespondentAnswers = [];
+                
+                // Flag para controle de sincronização
+                this.isLoadedFromServer = false;
+                
+                // Inicialização
                 this.init();
             }
 
@@ -2304,8 +2307,17 @@
                 }
             }
 
-            loadSurveys() {
-                // Dados já carregados no construtor
+            async loadSurveys() {
+                // Carregar do servidor PRIMEIRO
+                if (!this.isLoadedFromServer) {
+                    console.log('Carregando dados do servidor...');
+                    await this.loadFromServer();
+                    this.isLoadedFromServer = true;
+                }
+                
+                this.displaySurveyList();
+                this.displayResultsList();
+                this.updateStats();
             }
 
             displaySurveyList() {
@@ -2976,15 +2988,17 @@
             }
 
             async saveToLocalStorage() {
+                // Salvar no servidor PRIMEIRO
+                await this.syncWithServer();
+                
+                // Backup local (secundário)
                 localStorage.setItem('surveys_final', JSON.stringify(this.surveys));
                 localStorage.setItem('responses_final', JSON.stringify(this.responses));
                 
-                // Sincronizar imediatamente com servidor
-                await this.syncWithServer();
-                // E também carregar dados de outros dispositivos
+                // Carregar dados de outros dispositivos
                 setTimeout(async () => {
                     await this.loadFromServer();
-                }, 3000); // 3 segundos após salvar
+                }, 2000); // 2 segundos após salvar
             }
             
             // Métodos de sincronização com servidor
@@ -3036,15 +3050,15 @@
                         const data = await response.json();
                         console.log('Dados recebidos do servidor:', data);
                         
-                        // Mesclar dados do servidor com locais
+                        // SUBSTITUIR dados locais pelos do servidor (SERVIDOR É PRIMÁRIO)
                         const oldSurveyCount = this.surveys.length;
                         const oldResponseCount = this.responses.length;
                         
-                        this.surveys = this.mergeData(this.surveys, data.surveys || []);
-                        this.responses = this.mergeData(this.responses, data.responses || []);
-                        this.users = this.mergeData(this.users, data.users || []);
+                        this.surveys = data.surveys || [];
+                        this.responses = data.responses || [];
+                        this.users = data.users || [];
                         
-                        // Salvar localmente
+                        // Backup local (secundário)
                         localStorage.setItem('surveys_final', JSON.stringify(this.surveys));
                         localStorage.setItem('responses_final', JSON.stringify(this.responses));
                         localStorage.setItem('app_users', JSON.stringify(this.users));
@@ -3063,6 +3077,12 @@
                         this.displaySurveyList();
                         this.displayResultsList();
                         this.updateStats();
+                        
+                        console.log('Dados carregados do servidor:', {
+                            surveys: this.surveys.length,
+                            responses: this.responses.length,
+                            users: this.users.length
+                        });
                         
                         return true;
                     } else {
