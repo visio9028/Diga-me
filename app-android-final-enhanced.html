@@ -1847,17 +1847,38 @@
             }
             
             setupAutoSync() {
-                // Sincronizar a cada 15 segundos (reduzido para mais rapidez)
-                setInterval(async () => {
+                // Sincronizar imediatamente ao carregar
+                setTimeout(async () => {
                     await this.syncWithServer();
-                    await this.loadFromServer(); // Carregar dados de outros dispositivos
-                }, 15000);
+                    await this.loadFromServer();
+                }, 2000); // 2 segundos após carregar
+                
+                // Sincronizar a cada 10 segundos (mais rápido)
+                setInterval(async () => {
+                    console.log('Sincronização automática...');
+                    await this.syncWithServer();
+                    await this.loadFromServer();
+                }, 10000);
                 
                 // Sincronizar quando a janela ganhar foco
                 document.addEventListener('visibilitychange', async () => {
                     if (!document.hidden) {
                         console.log('Página ganhou foco - sincronizando...');
                         await this.loadFromServer();
+                    }
+                });
+                
+                // Sincronizar quando voltar da aba
+                window.addEventListener('focus', async () => {
+                    console.log('Janela ganhou foco - sincronizando...');
+                    await this.loadFromServer();
+                });
+                
+                // Sincronizar quando criar/alterar algo
+                window.addEventListener('storage', async (e) => {
+                    if (e.key && (e.key.includes('surveys') || e.key.includes('responses'))) {
+                        console.log('Dados alterados - sincronizando...');
+                        await this.syncWithServer();
                     }
                 });
                 
@@ -2958,8 +2979,12 @@
                 localStorage.setItem('surveys_final', JSON.stringify(this.surveys));
                 localStorage.setItem('responses_final', JSON.stringify(this.responses));
                 
-                // Sincronizar com servidor
+                // Sincronizar imediatamente com servidor
                 await this.syncWithServer();
+                // E também carregar dados de outros dispositivos
+                setTimeout(async () => {
+                    await this.loadFromServer();
+                }, 3000); // 3 segundos após salvar
             }
             
             // Métodos de sincronização com servidor
@@ -3005,7 +3030,7 @@
                 try {
                     this.showSyncStatus('Carregando dados do servidor...', 'syncing');
                     
-                    const response = await fetch(`${this.serverUrl}/api/data?apiKey=${this.apiKey}&deviceId=${this.getDeviceId()}`);
+                    const response = await fetch(`${this.serverUrl}/api/data`);
                     
                     if (response.ok) {
                         const data = await response.json();
