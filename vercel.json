@@ -19,10 +19,5 @@
       "src": "/(.*)",
       "dest": "/app-android-final-enhanced.html"
     }
-  ],
-  "functions": {
-    "vercel-api.js": {
-      "maxDuration": 10
-    }
-  }
+  ]
 }
