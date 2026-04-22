@@ -2,15 +2,10 @@
   "name": "diga-me-vercel",
   "version": "1.0.0",
   "description": "Diga-me App - Servidor 100% Gratuito no Vercel",
-  "main": "vercel-api.js",
+  "main": "api/index.js",
   "scripts": {
-    "dev": "vercel dev",
-    "build": "vercel build",
-    "deploy": "vercel --prod"
+    "dev": "vercel dev"
   },
   "dependencies": {},
-  "devDependencies": {
-    "vercel": "^28.4.8"
-  },
   "license": "MIT"
 }
