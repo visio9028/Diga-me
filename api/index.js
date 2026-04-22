@@ -1,11 +1,10 @@
-// API para Vercel - pasta api/
+// API SIMples para Vercel - Padrão automático
 export default function handler(req, res) {
-  // Configurar CORS
+  // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   
-  // Responder a requisições OPTIONS
   if (req.method === 'OPTIONS') {
     res.writeHead(200);
     res.end();
@@ -15,11 +14,7 @@ export default function handler(req, res) {
   const { method, query, body } = req;
   const pathname = req.url;
   
-  console.log(`${new Date().toISOString()} - ${method} ${pathname}`);
-  console.log('Body:', body);
-  console.log('Query:', query);
-  
-  // Banco de dados global
+  // Banco global
   let database = global.database || {
     surveys: [],
     responses: [],
@@ -27,61 +22,35 @@ export default function handler(req, res) {
   };
   global.database = database;
   
+  console.log(`${new Date().toISOString()} - ${method} ${pathname}`);
+  
   // Rota: /api/sync
   if (pathname === '/sync' && method === 'POST') {
-    console.log('SYNC recebido:', body);
+    const { surveys, responses, users } = body;
     
-    const { surveys, responses, users, deviceId } = body;
-    
-    // Mesclar pesquisas
     if (surveys) {
       surveys.forEach(survey => {
-        const existingIndex = database.surveys.findIndex(s => s.id === survey.id);
-        if (existingIndex === -1) {
+        if (!database.surveys.find(s => s.id === survey.id)) {
           database.surveys.push(survey);
-          console.log(`Nova pesquisa: ${survey.title}`);
-        } else {
-          const existingDate = new Date(database.surveys[existingIndex].updatedAt || database.surveys[existingIndex].createdAt);
-          const newDate = new Date(survey.updatedAt || survey.createdAt);
-          if (newDate > existingDate) {
-            database.surveys[existingIndex] = survey;
-            console.log(`Pesquisa atualizada: ${survey.title}`);
-          }
         }
       });
     }
     
-    // Mesclar respostas
     if (responses) {
       responses.forEach(response => {
-        const existingIndex = database.responses.findIndex(r => 
-          r.surveyId === response.surveyId && 
-          r.submittedAt === response.submittedAt &&
-          r.deviceId === response.deviceId
-        );
-        if (existingIndex === -1) {
+        if (!database.responses.find(r => r.id === response.id)) {
           database.responses.push(response);
-          console.log(`Nova resposta para: ${response.surveyId}`);
         }
       });
     }
     
-    // Mesclar usuários
     if (users) {
       users.forEach(user => {
-        const existingIndex = database.users.findIndex(u => u.id === user.id);
-        if (existingIndex === -1) {
+        if (!database.users.find(u => u.id === user.id)) {
           database.users.push(user);
-          console.log(`Novo usuário: ${user.name}`);
         }
       });
     }
-    
-    console.log('Banco de dados atualizado:', {
-      surveys: database.surveys.length,
-      responses: database.responses.length,
-      users: database.users.length
-    });
     
     res.json({
       success: true,
@@ -95,12 +64,6 @@ export default function handler(req, res) {
     
   // Rota: /api/data
   } else if (pathname === '/data' && method === 'GET') {
-    console.log('DATA solicitado - retornando:', {
-      surveys: database.surveys.length,
-      responses: database.responses.length,
-      users: database.users.length
-    });
-    
     res.json(database);
     
   // Rota: /api/survey/:id
@@ -118,13 +81,11 @@ export default function handler(req, res) {
   } else if (pathname === '/respond' && method === 'POST') {
     const response = {
       ...body,
-      id: body.id || 'response_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+      id: body.id || 'response_' + Date.now(),
       submittedAt: body.submittedAt || new Date().toISOString()
     };
     
     database.responses.push(response);
-    
-    console.log(`Resposta recebida: ${response.surveyId}`);
     
     res.json({
       success: true,
@@ -132,13 +93,7 @@ export default function handler(req, res) {
       responseId: response.id
     });
     
-  // Rota não encontrada
   } else {
-    console.log(`Rota não encontrada: ${method} ${pathname}`);
-    res.status(404).json({ 
-      error: 'Endpoint não encontrado',
-      path: pathname,
-      method: method
-    });
+    res.status(404).json({ error: 'Endpoint não encontrado' });
   }
 }
