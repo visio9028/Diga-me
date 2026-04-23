@@ -1,4 +1,4 @@
-// API SIMples para Vercel - Padrão automático
+// API Super Simples para Vercel
 export default function handler(req, res) {
   // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -6,94 +6,77 @@ export default function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   
   if (req.method === 'OPTIONS') {
-    res.writeHead(200);
-    res.end();
-    return;
+    return res.status(200).end();
   }
   
-  const { method, query, body } = req;
-  const pathname = req.url;
+  const { method, url } = req;
   
-  // Banco global
-  let database = global.database || {
-    surveys: [],
-    responses: [],
-    users: []
-  };
-  global.database = database;
+  // Banco em memória global
+  if (!global.database) {
+    global.database = {
+      surveys: [],
+      responses: [],
+      users: []
+    };
+  }
   
-  console.log(`${new Date().toISOString()} - ${method} ${pathname}`);
+  const db = global.database;
+  
+  // Log para debug
+  console.log(`${new Date().toISOString()} - ${method} ${url}`);
+  
+  // Rota: /api/data
+  if (url === '/data' && method === 'GET') {
+    return res.json(db);
+  }
   
   // Rota: /api/sync
-  if (pathname === '/sync' && method === 'POST') {
-    const { surveys, responses, users } = body;
-    
-    if (surveys) {
-      surveys.forEach(survey => {
-        if (!database.surveys.find(s => s.id === survey.id)) {
-          database.surveys.push(survey);
-        }
-      });
-    }
-    
-    if (responses) {
-      responses.forEach(response => {
-        if (!database.responses.find(r => r.id === response.id)) {
-          database.responses.push(response);
-        }
-      });
-    }
-    
-    if (users) {
-      users.forEach(user => {
-        if (!database.users.find(u => u.id === user.id)) {
-          database.users.push(user);
-        }
-      });
-    }
-    
-    res.json({
-      success: true,
-      message: 'Dados sincronizados',
-      stats: {
-        surveys: database.surveys.length,
-        responses: database.responses.length,
-        users: database.users.length
+  if (url === '/sync' && method === 'POST') {
+    req.body.surveys?.forEach(survey => {
+      if (!db.surveys.find(s => s.id === survey.id)) {
+        db.surveys.push(survey);
+        console.log('Nova pesquisa:', survey.title);
       }
     });
     
-  // Rota: /api/data
-  } else if (pathname === '/data' && method === 'GET') {
-    res.json(database);
-    
-  // Rota: /api/survey/:id
-  } else if (pathname.startsWith('/survey/') && method === 'GET') {
-    const surveyId = pathname.split('/')[2];
-    const survey = database.surveys.find(s => s.id === surveyId);
-    
-    if (survey) {
-      res.json(survey);
-    } else {
-      res.status(404).json({ error: 'Pesquisa não encontrada' });
-    }
-    
-  // Rota: /api/respond
-  } else if (pathname === '/respond' && method === 'POST') {
-    const response = {
-      ...body,
-      id: body.id || 'response_' + Date.now(),
-      submittedAt: body.submittedAt || new Date().toISOString()
-    };
-    
-    database.responses.push(response);
-    
-    res.json({
-      success: true,
-      message: 'Resposta registrada',
-      responseId: response.id
+    req.body.responses?.forEach(response => {
+      if (!db.responses.find(r => r.id === response.id)) {
+        db.responses.push(response);
+        console.log('Nova resposta:', response.surveyId);
+      }
     });
     
-  } else {
-    res.status(404).json({ error: 'Endpoint não encontrado' });
+    req.body.users?.forEach(user => {
+      if (!db.users.find(u => u.id === user.id)) {
+        db.users.push(user);
+        console.log('Novo usuário:', user.name);
+      }
+    });
+    
+    return res.json({
+      success: true,
+      message: 'Sincronizado',
+      stats: {
+        surveys: db.surveys.length,
+        responses: db.responses.length,
+        users: db.users.length
+      }
+    });
   }
+  
+  // Outras rotas
+  if (url.startsWith('/survey/') && method === 'GET') {
+    const id = url.split('/')[2];
+    const survey = db.surveys.find(s => s.id === id);
+    return survey ? res.json(survey) : res.status(404).json({ error: 'Não encontrado' });
+  }
+  
+  if (url === '/respond' && method === 'POST') {
+    const response = { ...req.body, id: 'resp_' + Date.now() };
+    db.responses.push(response);
+    return res.json({ success: true, responseId: response.id });
+  }
+  
+  // 404
+  res.status(404).json({ error: 'Rota não encontrada', url, method });
 }
